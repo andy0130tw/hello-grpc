@@ -1,0 +1,42 @@
+
+syntax = "proto3";
+
+package mychatroom;
+
+service Chatroom {
+  rpc Register (RegisterRequest) returns (GeneralResponse) {}
+  rpc Chat (ChatRequest) returns (GeneralResponse) {}
+  rpc Subscribe (SubscribeRequest) returns (stream Broadcast) {}
+}
+
+message GeneralResponse {
+  bool ok = 1;
+  string msg = 2;
+  uint64 token = 3;
+}
+
+message RegisterRequest {
+  string name = 1;
+}
+
+message ChatRequest {
+  uint64 token = 1;
+  string msg = 2;
+}
+
+message SubscribeRequest {
+  uint64 token = 1;
+}
+
+message Broadcast {
+  enum msgtype {
+    UNSPECIFIED = 0;
+    USER_JOIN = 1;
+    USER_MSG = 2;
+  }
+
+  msgtype type = 1;
+  string name = 2;
+  string msg = 3;
+  string origin = 4;
+}

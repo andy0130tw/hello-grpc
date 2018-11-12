@@ -33,6 +33,7 @@ message Broadcast {
     UNSPECIFIED = 0;
     USER_JOIN = 1;
     USER_MSG = 2;
+    FAILURE = 127;
   }
 
   msgtype type = 1;

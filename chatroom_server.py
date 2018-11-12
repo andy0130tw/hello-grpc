@@ -11,49 +11,69 @@ import chatroom_pb2_grpc
 _ONE_DAY_IN_SECONDS = 60 * 60 * 24
 
 chatroomUsers = {}
+chatroomNames = set()
 queues = []
 
 class ChatroomServicer(chatroom_pb2_grpc.ChatroomServicer):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
     def Register(self, request, context):
-        if request.name is None or len(request.name) >= 32:
+        cname = request.name
+        if cname is None or len(cname) >= 32:
             return chatroom_pb2.GeneralResponse(ok=False, msg='Illegal name')
+        if cname in chatroomNames:
+            return chatroom_pb2.GeneralResponse(ok=False, msg='This name has been used')
+
         token = ChatroomServicer._generateUserToken()
+        chatroomNames.add(cname)
         chatroomUsers[token] = {
-            'name': request.name,
-            'stream': None
+            'name': cname
         }
+        self._putToQueues({
+            'type': chatroom_pb2.Broadcast.USER_JOIN,
+            'name': cname
+        })
+
+        print('User [{}] registered.'.format(cname))
         return chatroom_pb2.GeneralResponse(ok=True, msg='OK', token=token)
 
     def Chat(self, request, context):
         if not self._isAuthorized(request):
             return chatroom_pb2.GeneralResponse(ok=False, msg='Not authorized')
+        if len(request.msg.strip()) == 0:
+            return chatroom_pb2.GeneralResponse(ok=False, msg='Empty message')
 
         curUser = chatroomUsers[request.token]
-        self._putToQueues(request.token, { 'name': curUser['name'], 'msg': request.msg })
+        self._putToQueues({
+            'type': chatroom_pb2.Broadcast.USER_MSG,
+            'name': curUser['name'],
+            'msg': request.msg
+        })
         return chatroom_pb2.GeneralResponse(ok=True, msg='Sent')
 
     def Subscribe(self, request, context):
         if not self._isAuthorized(request):
-            return None
+            return chatroom_pb2.Broadcast()
+
+        if 'stream' in chatroomUsers[request.token]:
+            return chatroom_pb2.Broadcast(type=chatroom_pb2.Broadcast.FAILURE, msg='Already subscribed')
 
         q = queue.Queue()
         queues.append(q)
-        chatroomUsers[request.token]['queue'] = q
-        yield chatroom_pb2.Broadcast(type=0)
+        chatroomUsers[request.token]['stream'] = q
+        yield chatroom_pb2.Broadcast(type=chatroom_pb2.Broadcast.UNSPECIFIED)
 
         while True:
-            obj = chatroomUsers[request.token]['queue'].get()
-            yield chatroom_pb2.Broadcast(type=2, **obj)
+            q = chatroomUsers[request.token]['stream']
+            obj = q.get()
+            if obj is None:
+                yield chatroom_pb2.Broadcast(type=chatroom_pb2.Broadcast.FAILURE, msg='The server is shutting down')
+                return
+            yield chatroom_pb2.Broadcast(**obj)
+            q.task_done()
 
-    def _putToQueues(self, user_token, obj):
+    def _putToQueues(self, obj):
         for token, user in chatroomUsers.items():
-            if token == user_token:
-                continue
-            if 'queue' in user:
-                user['queue'].put(obj)
+            if 'stream' in user:
+                user['stream'].put(obj)
 
     def _isAuthorized(self, request):
         return not(request.token is None or request.token not in chatroomUsers)

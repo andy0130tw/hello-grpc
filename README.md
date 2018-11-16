@@ -6,12 +6,16 @@ A naive chatroom featuring (!) gRPC, owo
 Install dependencies:
 
 ```bash
-pip3 install grpcio grpcio-tools googleapis-common-protos`
+pip3 install grpcio grpcio-tools googleapis-common-protos
 ```
 
 You can refer to [this tutorial on gRPC](https://grpc.io/docs/quickstart/python.html).
 
-To generate classes for services, run `python codegen.py`. This generates two python files.
+To generate classes for services, run `python codegen.py`. This generates two python files. It should be noticed you may need to update `protobuf` if this step fails.
+
+```bash
+pip3 install protobuf --upgrade
+```
 
 # Running
 

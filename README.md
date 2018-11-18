@@ -1,6 +1,8 @@
 # hello-grpc
 A naive chatroom featuring (!) gRPC, owo
 
+[**See it in action!**](https://imgur.com/C6rZUYN)
+
 # Building
 
 Install dependencies:

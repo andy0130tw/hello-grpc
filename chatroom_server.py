@@ -1,18 +1,19 @@
 from concurrent import futures
-import time
-import random
 import queue
+import random
+import signal
+import time
 
 import grpc
 
 import chatroom_pb2
 import chatroom_pb2_grpc
 
-_ONE_DAY_IN_SECONDS = 60 * 60 * 24
 
 chatroomUsers = {}
 chatroomNames = set()
 queues = []
+
 
 class ChatroomServicer(chatroom_pb2_grpc.ChatroomServicer):
     def Register(self, request, context):
@@ -56,6 +57,11 @@ class ChatroomServicer(chatroom_pb2_grpc.ChatroomServicer):
         if 'stream' in chatroomUsers[request.token]:
             return chatroom_pb2.Broadcast(type=chatroom_pb2.Broadcast.FAILURE, msg='Already subscribed')
 
+        cb_added = context.add_callback(self._onDisconnectWrapper(request, context))
+
+        if not cb_added:
+            print('Warning: disconnection will not be called')
+
         q = queue.Queue()
         queues.append(q)
         chatroomUsers[request.token]['stream'] = q
@@ -78,6 +84,18 @@ class ChatroomServicer(chatroom_pb2_grpc.ChatroomServicer):
     def _isAuthorized(self, request):
         return not(request.token is None or request.token not in chatroomUsers)
 
+    def _onDisconnectWrapper(self, request, context):
+        # Be careful! The error here is silently ignored!
+        def callback():
+            curUser = chatroomUsers[request.token]
+            print('User [{}] disconnected.'.format(curUser['name']))
+            self._putToQueues({
+                'type': chatroom_pb2.Broadcast.USER_LEAVE,
+                'name': curUser['name']
+            })
+            del curUser['stream']
+        return callback
+
     @staticmethod
     def _generateUserToken():
         return random.getrandbits(64)
@@ -90,8 +108,7 @@ def serve():
     server.start()
     print('>>> Server started')
     try:
-        while True:
-            time.sleep(_ONE_DAY_IN_SECONDS)
+        signal.pause()
     except KeyboardInterrupt:
         print('>>> Exiting')
         # to unblock all queues

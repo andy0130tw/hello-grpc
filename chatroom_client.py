@@ -42,6 +42,8 @@ def run():
         for resp in subscribeResps:
             if resp.type == chatroom_pb2.Broadcast.USER_JOIN:
                 print('\x1b[1K\x1b[G+ [{}] has joined the chat'.format(resp.name))
+            elif resp.type == chatroom_pb2.Broadcast.USER_LEAVE:
+                print('\x1b[1K\x1b[G- [{}] has left the chat'.format(resp.name))
             elif resp.type == chatroom_pb2.Broadcast.FAILURE:
                 print('\x1b[1K\x1b[G!!! Failure: {}'.format(resp.msg))
                 break
@@ -52,4 +54,7 @@ def run():
 
 
 if __name__ == '__main__':
-    run()
+    try:
+        run()
+    except KeyboardInterrupt:
+        print('Bye')

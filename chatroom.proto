@@ -33,6 +33,7 @@ message Broadcast {
     UNSPECIFIED = 0;
     USER_JOIN = 1;
     USER_MSG = 2;
+    USER_LEAVE = 3;
     FAILURE = 127;
   }
 
